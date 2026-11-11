@@ -33,3 +33,33 @@ def get_documents():
             status_code=500,
             detail="Unable to retrieve document metadata"
         )
+
+@router.get("/documents/{document_id}")
+def get_document(document_id: str):
+
+    if not METADATA_FILE.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    try:
+        with open(METADATA_FILE, "r", encoding="utf-8") as file:
+            documents = json.load(file)
+
+        for document in documents:
+            if document["id"] == document_id:
+                return {
+                    "document": document
+                }
+
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    except (json.JSONDecodeError, OSError):
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to retrieve document metadata"
+        )
