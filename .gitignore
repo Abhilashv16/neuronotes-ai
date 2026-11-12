@@ -1,5 +1,11 @@
 .venv/
+venv/
 __pycache__/
 *.py[cod]
-data/
+.pytest_cache/
+.idea/
+.vscode/
+data/*
+!data/.gitkeep
 resume.pdf
+.env
