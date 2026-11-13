@@ -4,15 +4,13 @@ from collections import Counter
 
 
 STOP_WORDS = {
-    "the", "is", "are", "was", "were", "a", "an",
-    "and", "or", "but", "in", "on", "at", "to",
-    "of", "for", "with", "by", "from", "as", "it",
-    "this", "that", "these", "those", "be", "been",
-    "being", "has", "have", "had", "do", "does",
-    "did", "will", "would", "could", "should",
-    "can", "may", "might", "must", "not", "we",
-    "they", "he", "she", "you", "i", "their",
-    "our", "your", "its", "them", "his", "her"
+    "the", "is", "are", "was", "were",
+    "a", "an", "and", "or", "but",
+    "to", "of", "in", "on", "for",
+    "with", "as", "by", "from",
+    "that", "this", "it", "be",
+    "has", "have", "had", "will",
+    "we", "they", "their", "you"
 }
 
 
@@ -21,59 +19,73 @@ def clean_text(text):
     return text.strip()
 
 
-def extract_sentences(text):
-    sentences = re.split(
-        r"(?<=[.!?])\s+",
-        clean_text(text)
-    )
-
+def split_sentences(text):
     return [
         sentence.strip()
-        for sentence in sentences
+        for sentence in re.split(
+            r"(?<=[.!?])\s+",
+            clean_text(text)
+        )
         if len(sentence.strip()) > 20
     ]
 
 
-def extract_keywords(text, limit=15):
+def extract_keywords(text, limit=10):
+
     words = re.findall(
-        r"\b[a-zA-Z][a-zA-Z0-9'-]*\b",
+        r"\b[a-zA-Z][a-zA-Z'-]{2,}\b",
         text.lower()
     )
 
-    filtered_words = [
+    words = [
         word for word in words
-        if word not in STOP_WORDS and len(word) > 2
+        if word not in STOP_WORDS
     ]
 
-    frequency = Counter(filtered_words)
+    frequencies = Counter(words)
 
     return [
-        word for word, count in frequency.most_common(limit)
+        word for word, count
+        in frequencies.most_common(limit)
     ]
 
 
-def extract_key_points(text, limit=10):
-    sentences = extract_sentences(text)
+def generate_summary(sentences, max_sentences=7):
 
     if not sentences:
         return []
 
-    keywords = extract_keywords(text, limit=30)
+    words = re.findall(
+        r"\b[a-zA-Z][a-zA-Z'-]{2,}\b",
+        " ".join(sentences).lower()
+    )
 
-    keyword_set = set(keywords)
+    frequencies = Counter(
+        word for word in words
+        if word not in STOP_WORDS
+    )
+
+    if not frequencies:
+        return sentences[:max_sentences]
+
+    max_frequency = max(frequencies.values())
 
     scored_sentences = []
 
     for index, sentence in enumerate(sentences):
-        words = re.findall(
-            r"\b[a-zA-Z][a-zA-Z0-9'-]*\b",
+
+        sentence_words = re.findall(
+            r"\b[a-zA-Z][a-zA-Z'-]{2,}\b",
             sentence.lower()
         )
 
         score = sum(
-            1 for word in words
-            if word in keyword_set
+            frequencies[word] / max_frequency
+            for word in sentence_words
+            if word in frequencies
         )
+
+        score /= max(len(sentence_words), 1)
 
         scored_sentences.append(
             (score, index, sentence)
@@ -81,8 +93,8 @@ def extract_key_points(text, limit=10):
 
     selected = sorted(
         scored_sentences,
-        key=lambda item: (-item[0], item[1])
-    )[:limit]
+        reverse=True
+    )[:max_sentences]
 
     selected.sort(key=lambda item: item[1])
 
@@ -92,12 +104,20 @@ def extract_key_points(text, limit=10):
 
 
 def process_text(text):
-    cleaned_text = clean_text(text)
+
+    cleaned = clean_text(text)
+
+    sentences = split_sentences(cleaned)
+
+    keywords = extract_keywords(cleaned)
+
+    summary = generate_summary(sentences)
 
     return {
-        "cleaned_text": cleaned_text,
-        "sentences": extract_sentences(cleaned_text),
-        "keywords": extract_keywords(cleaned_text),
-        "key_points": extract_key_points(cleaned_text),
-        "word_count": len(cleaned_text.split())
+        "cleaned_text": cleaned,
+        "sentences": sentences,
+        "keywords": keywords,
+        "summary": summary,
+        "key_points": summary[:5],
+        "word_count": len(cleaned.split())
     }

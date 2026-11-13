@@ -1,45 +1,47 @@
 
-_model = None
+from functools import lru_cache
 
 
-class EmbeddingUnavailableError(Exception):
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+
+
+class EmbeddingUnavailableError(RuntimeError):
     pass
 
 
+@lru_cache(maxsize=1)
 def load_model():
-    global _model
-
-    if _model is not None:
-        return _model
 
     try:
         from sentence_transformers import SentenceTransformer
 
-        _model = SentenceTransformer(
-            "sentence-transformers/all-MiniLM-L6-v2"
-        )
-
-        return _model
+        return SentenceTransformer(MODEL_NAME)
 
     except Exception as error:
         raise EmbeddingUnavailableError(
             f"Unable to load embedding model: {error}"
-        )
+        ) from error
 
 
 def generate_embedding(text):
-    if not text or not text.strip():
-        raise ValueError("Cannot generate embedding for empty text")
 
-    model = load_model()
+    if not text.strip():
+        return []
 
-    vector = model.encode(
-        text[:10000],
-        normalize_embeddings=True
-    )
+    try:
+        model = load_model()
 
-    return {
-        "model": "all-MiniLM-L6-v2",
-        "dimensions": len(vector),
-        "vector": vector.tolist()
-    }
+        embedding = model.encode(
+            text,
+            normalize_embeddings=True
+        )
+
+        return embedding.tolist()
+
+    except EmbeddingUnavailableError:
+        raise
+
+    except Exception as error:
+        raise EmbeddingUnavailableError(
+            f"Embedding generation failed: {error}"
+        ) from error
